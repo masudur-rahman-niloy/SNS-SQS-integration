@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SNS and SQS integration
+
+
+Parameters:
+  ENV:
+    Type: String
+    Default: dev
+  SqsQueueName:
+    Type: String
+    Default: MySQS
+  SNSName:
+    Type: String
+    Default: MySns
+
+Resources:
+
+  SnsToSqsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "Allow SNS publish to SQS"
+            Effect: Allow
+            Principal:
+              Service: "sns.amazonaws.com"
+            Resource: [
+              !GetAtt SqsQueue.Arn,
+              !GetAtt SqsQueue2.Arn,
+            ]
+            Action: SQS:SendMessage
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref SnsTopic
+      Queues:
+        - Ref: SqsQueue
+        - Ref: SqsQueue2
+
+  SqsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${SqsQueueName}-${ENV}"
+
+  SqsQueue2:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${SqsQueueName}2-${ENV}"
+
+  SnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${SNSName}-${ENV}"
+      Subscription:
+        - Protocol: sqs
+          Endpoint: !GetAtt SqsQueue.Arn
+        - Protocol: sqs
+          Endpoint: !GetAtt SqsQueue2.Arn
